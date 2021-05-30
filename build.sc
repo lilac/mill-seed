@@ -8,7 +8,7 @@ object core extends SbtModule {
   override def mainClass: T[Option[String]] = Some("Main")
 
   override def ivyDeps = Agg(
-    ivy"org.typelevel::cats-effect::2.3.1",
+    ivy"org.typelevel::cats-effect::3.1.1",
     ivy"com.typesafe.akka::akka-actor:$akkaVersion",
     ivy"com.typesafe.akka::akka-persistence:$akkaVersion"
   )
