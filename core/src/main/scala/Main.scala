@@ -1,6 +1,5 @@
 import cats.effect.{ExitCode, FiberIO, IO, IOApp}
 
-import java.util.concurrent.TimeoutException
 import scala.concurrent.duration.DurationInt
 
 object Main extends IOApp {
@@ -12,8 +11,7 @@ object Main extends IOApp {
     for {
       fibers <- startAll(workers)
       results <- awaitAll(fibers)
-        .timeout(1200.millis)
-        .handleErrorWith { case _: TimeoutException => IO.pure(Seq.empty) }
+        .timeoutTo(1200.millis, IO.pure(Seq.empty))
     } yield results
   }
 
@@ -59,7 +57,6 @@ object Main extends IOApp {
 
   def worker(id: Int): IO[Int] = for {
     _ <- IO.sleep(1.second)
-    //    _ <- IO.println(s"worker $id started")
   } yield id * 2
 }
 
