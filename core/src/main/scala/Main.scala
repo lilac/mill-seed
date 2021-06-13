@@ -11,17 +11,19 @@ object Main extends IOApp {
     for {
       fibers <- startAll(workers)
       results <- awaitAll(fibers)
-        .timeoutTo(1200.millis, IO.pure(Seq.empty))
     } yield results
   }
 
   override def run(args: List[String]): IO[ExitCode] = for {
     start <- IO.realTime
-    results <- task.timed
+    results <- task
+      .timeoutTo(3000.millis, IO.pure(Seq.empty))
+      .timed
     end <- IO.realTime
-    _ <- IO.println(s"Time: ${results._1.toMillis}") *>
+    (time, nums) = results
+    _ <- IO.println(s"Time: ${time.toMillis}") *>
       IO.println(s"Real time: ${end - start}") *>
-      IO.println(s"Results: ${results._2.size}")
+      IO.println(s"Results count: ${nums.size}")
   } yield {
     ExitCode.Success
   }
