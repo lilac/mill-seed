@@ -1,55 +1,65 @@
 import cats.effect.{ExitCode, FiberIO, IO, IOApp}
 
+import java.util.concurrent.TimeoutException
 import scala.concurrent.duration.DurationInt
 
 object Main extends IOApp {
 
-  override def run(args: List[String]): IO[ExitCode] = for {
-    start <- IO.realTime
-    workers = 1.to(1000)
+  private val task = {
+    val workers = 1.to(100000)
       .toList
       .map(worker)
-    fibers <- startAll(workers)
-    results <- awaitAll(fibers)
+    for {
+      fibers <- startAll(workers)
+      results <- awaitAll(fibers)
+        .timeout(1200.millis)
+        .handleErrorWith { case _: TimeoutException => IO.pure(Seq.empty) }
+    } yield results
+  }
+
+  override def run(args: List[String]): IO[ExitCode] = for {
+    start <- IO.realTime
+    results <- task.timed
     end <- IO.realTime
+    _ <- IO.println(s"Time: ${results._1.toMillis}") *>
+      IO.println(s"Real time: ${end - start}") *>
+      IO.println(s"Results: ${results._2.size}")
   } yield {
-    println(s"Time: ${end - start}")
-    println(s"Results: $results")
     ExitCode.Success
   }
 
-  def startAll[T](tasks: Seq[IO[T]]): IO[Seq[FiberIO[T]]] = {
+  def startAll[T](tasks: List[IO[T]]): IO[List[FiberIO[T]]] = {
     tasks match {
-      case Seq() => IO.pure(Seq.empty)
-      case Seq(t) => t.start.map(Seq(_))
+      case Nil => IO.pure(List.empty)
+      case t :: Nil => t.start.map(List(_))
       case a :: b :: other =>
         for {
           fa <- a.start
           fb <- b.start
           fo <- startAll(other)
-        } yield Seq(fa, fb) ++ fo
+        } yield fa :: fb :: fo
     }
   }
 
-  def awaitAll[T](fibers: Seq[FiberIO[T]]): IO[Seq[T]] = {
+  def awaitAll[T](fibers: List[FiberIO[T]]): IO[List[T]] = {
     fibers match {
-      case Seq() => IO.pure(Seq.empty)
-      case Seq(f) =>
+      case Nil => IO.pure(Nil)
+      case f :: Nil =>
         for {
           outcome <- f.joinWithNever
-        } yield Seq(outcome)
+        } yield List(outcome)
       case fa :: fb :: fs =>
         for {
           ra <- fa.joinWithNever
           rb <- fb.joinWithNever
           ro <- awaitAll(fs)
-        } yield Seq(ra, rb) ++ ro
+        } yield ra :: rb :: ro
     }
   }
 
   def worker(id: Int): IO[Int] = for {
     _ <- IO.sleep(1.second)
-    _ = println(s"worker $id started")
+    //    _ <- IO.println(s"worker $id started")
   } yield id * 2
 }
 
